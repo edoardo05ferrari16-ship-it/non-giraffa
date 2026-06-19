@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Giraffa Runner FIXED</title>
+
+<style>
+body{margin:0;overflow:hidden;background:#87CEEB;font-family:Courier}
+canvas{display:block}
+
+#ui{
+position:absolute;top:10px;left:10px;
+color:white;font-size:18px;
+text-shadow:2px 2px black;
+z-index:5;
+}
+
+#start{
+position:absolute;inset:0;
+display:flex;flex-direction:column;
+align-items:center;justify-content:center;
+background:rgba(0,0,0,0.85);
+color:white;
+z-index:10;
+}
+
+button{
+padding:15px 25px;
+font-size:18px;
+}
+
+#controls{
+position:absolute;
+bottom:20px;
+width:100%;
+display:flex;
+justify-content:space-between;
+padding:0 20px;
+z-index:5;
+}
+
+.btn{
+width:70px;height:70px;
+font-size:28px;
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="c"></canvas>
+
+<div id="ui">TIME: <span id="t">180</span></div>
+
+<div id="start">
+<h1>🦒 GIRAFFA RUNNER</h1>
+<button onclick="startGame()">START</button>
+</div>
+
+<div id="controls">
+<div>
+<button class="btn" id="down">⬇</button>
+<button class="btn" id="up">⬆</button>
+</div>
+<div>
+<button class="btn" id="left">⬅</button>
+<button class="btn" id="right">➡</button>
+</div>
+</div>
+
+<script>
+
+const c=document.getElementById("c");
+const ctx=c.getContext("2d");
+c.width=800;c.height=400;
+
+let keys={};
+
+let world={
+scroll:0,time:180,started:false,gameOver:false
+};
+
+let g={
+x:200,y:280,w:40,h:60,
+vy:0,onGround:false,crouch:false
+};
+
+let platforms=[];
+let obstacles=[];
+
+function generate(){
+
+platforms=[];
+obstacles=[];
+
+platforms.push({x:0,y:340,w:2000,h:60});
+
+for(let i=0;i<25;i++){
+
+let x=i*90;
+
+if(Math.random()<0.5){
+obstacles.push({x:x+30,y:300,w:40,h:40,type:"rock"});
+}
+
+if(Math.random()<0.4){
+obstacles.push({x:x+10,y:250,w:70,h:20,type:"branch"});
+}
+
+}
+
+}
+
+function drawRect(x,y,w,h,c){
+ctx.fillStyle=c;
+ctx.fillRect(x,y,w,h);
+}
+
+function drawG(){
+
+let sx=g.x-world.scroll;
+
+drawRect(sx,g.y,g.w,g.h,"#FFD54F");
+
+// collo
+drawRect(sx+15,g.y-40,10,40,"#FFD54F");
+
+// testa
+drawRect(sx+10,g.y-55,25,15,"#FFD54F");
+}
+
+function startGame(){
+document.getElementById("start").style.display="none";
+world.started=true;
+generate();
+loop();
+}
+
+function update(){
+
+if(!world.started) return;
+
+world.time-=1/60;
+if(world.time<=0) world.gameOver=true;
+
+g.vy+=0.6;
+
+if(keys["ArrowRight"]) g.x+=4;
+if(keys["ArrowLeft"]) g.x-=3;
+
+if(keys["ArrowUp"] && g.onGround){
+g.vy=-12;
+g.onGround=false;
+}
+
+g.crouch=keys["ArrowDown"] && g.onGround;
+
+g.y+=g.vy;
+
+let gh=g.crouch?35:60;
+
+// piattaforme
+g.onGround=false;
+
+for(let p of platforms){
+
+if(
+g.x < p.x+p.w &&
+g.x+g.w > p.x &&
+g.y+gh >= p.y &&
+g.y+gh <= p.y+15 &&
+g.vy>=0
+){
+g.y=p.y-gh;
+g.vy=0;
+g.onGround=true;
+}
+
+}
+
+// camera
+world.scroll=g.x-200;
+if(world.scroll<0) world.scroll=0;
+
+// collisioni
+for(let o of obstacles){
+
+let hit=
+g.x < o.x+o.w &&
+g.x+g.w > o.x &&
+g.y < o.y+o.h &&
+g.y+gh > o.y;
+
+if(hit){
+
+if(o.type==="rock"){
+world.gameOver=true;
+}
+
+if(o.type==="branch" && !g.crouch){
+world.gameOver=true;
+}
+
+}
+
+}
+
+if(g.y>450) world.gameOver=true;
+
+}
+
+function draw(){
+
+ctx.clearRect(0,0,800,400);
+
+drawRect(0,0,800,400,"#87CEEB");
+
+drawRect(0,340,800,60,"#8B4513");
+
+// piattaforme
+for(let p of platforms){
+drawRect(p.x-world.scroll,p.y,p.w,p.h,"#228B22");
+}
+
+// ostacoli
+for(let o of obstacles){
+let x=o.x-world.scroll;
+drawRect(x,o.y,o.w,o.h,o.type==="rock"?"gray":"brown");
+}
+
+// giraffa
+drawG();
+
+document.getElementById("t").innerText=Math.floor(world.time);
+
+// game over
+if(world.gameOver){
+ctx.fillStyle="rgba(0,0,0,0.7)";
+ctx.fillRect(0,0,800,400);
+ctx.fillStyle="white";
+ctx.font="40px Arial";
+ctx.fillText("GAME OVER",250,200);
+}
+}
+
+function loop(){
+update();
+draw();
+requestAnimationFrame(loop);
+}
+
+// tastiera
+window.addEventListener("keydown",e=>keys[e.key]=true);
+window.addEventListener("keyup",e=>keys[e.key]=false);
+
+// touch buttons
+["left","right","up","down"].forEach(id=>{
+document.getElementById(id).addEventListener("touchstart",()=>keys["Arrow"+id.charAt(0).toUpperCase()+id.slice(1)]=true);
+document.getElementById(id).addEventListener("touchend",()=>keys["Arrow"+id.charAt(0).toUpperCase()+id.slice(1)]=false);
+});
+
+</script>
+
+</body>
+</html>
